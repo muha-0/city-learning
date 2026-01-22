@@ -14,11 +14,13 @@ print("Data loaded successfully!")
 import sys
 from pathlib import Path
 
-sys.path.append(str(Path().resolve().parent))  # or grandparent depending on where you are
+sys.path.append(
+    str(Path().resolve().parent)
+)  # or grandparent depending on where you are
 
 from src.features.FeatureExtract import extract_features_from_edges
 
-print('Extracting Features')
+print("Extracting Features")
 X, y = extract_features_from_edges(edges, G_undirected)
 
 # %%
@@ -32,13 +34,13 @@ model = CityLearningModel()
 
 model.train(X_train, y_train)
 
-osmid_series = X_test.join(edges['single_osmid'])['single_osmid']
+osmid_series = X_test.join(edges["single_osmid"])["single_osmid"]
 y_pred = model.predict(X_test, osmid_series)
 
 mae, r2, mse, rmse = model.evaluate(y_pred, y_test)
 
-print(mae, ', ', r2, ', ', mse, ', ', rmse)
+print(mae, ", ", r2, ", ", mse, ", ", rmse)
 
 
-model.save_model('../models/city_learning.pkl')
+model.save_model("../saved_models/city_learning.pkl")
 # %%

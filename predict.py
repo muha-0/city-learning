@@ -1,8 +1,18 @@
 # %%
 import osmnx as ox
+import os
 from modules.city_learning.src.models.CityLearningModel import CityLearningModel
-from modules.city_learning.src.features.FeatureExtract import extract_features_from_edges
+from modules.city_learning.src.features.FeatureExtract import (
+    extract_features_from_edges,
+)
 from modules.city_learning.src.utils.utils import simplify_osmnx_graph_to_gdf
+
+# from src.models.CityLearningModel import CityLearningModel
+# from src.features.FeatureExtract import (
+#     extract_features_from_edges,
+# )
+# from src.utils.utils import simplify_osmnx_graph_to_gdf
+
 from shapely.geometry import box
 
 ox.settings.log_console = False
@@ -17,36 +27,60 @@ def infer_metadata(min_lon, min_lat, max_lon, max_lat):
 
     # Download road network within the bounding box polygon
     print("Downloading road network from bounding box polygon...")
-    G = ox.graph_from_polygon(box(min_lon, min_lat, max_lon, max_lat), network_type='drive')
+    G = ox.graph_from_polygon(
+        box(min_lon, min_lat, max_lon, max_lat), network_type="drive"
+    )
 
-    print('Simplifying Graph into Geodataframe')
+    print("Simplifying Graph into Geodataframe")
     edges, G_undirected = simplify_osmnx_graph_to_gdf(G)
     import pandas as pd
+
     def parse_highway(val):
         if isinstance(val, list):
-            try: return val[0]
-            except: return None
+            try:
+                return val[0]
+            except:
+                return None
         return val
 
-    edges['highway_c'] = edges['highway'].apply(parse_highway)
+    edges["highway_c"] = edges["highway"].apply(parse_highway)
 
     # Define all possible highway categories (even if some aren't present in the current dataset)
     ALL_HIGHWAY_CATEGORIES = [
-        'primary', 'primary_link', 'secondary', 'secondary_link', 'tertiary', 'tertiary_link', 'trunk', 'trunk_link', 
-        'residential', 'unclassified', 'motorway', 'service', 'living_street', 'track', 'footway'
+        "primary",
+        "primary_link",
+        "secondary",
+        "secondary_link",
+        "tertiary",
+        "tertiary_link",
+        "trunk",
+        "trunk_link",
+        "residential",
+        "unclassified",
+        "motorway",
+        "service",
+        "living_street",
+        "track",
+        "footway",
     ]
 
     # Convert to categorical with fixed categories
-    edges['highway_c'] = pd.Categorical(edges['highway_c'], categories=ALL_HIGHWAY_CATEGORIES)
+    edges["highway_c"] = pd.Categorical(
+        edges["highway_c"], categories=ALL_HIGHWAY_CATEGORIES
+    )
+    print(edges['highway_c'])
+
 
     # Now get_dummies will generate all expected columns
-    highway_vals_df = pd.get_dummies(edges['highway_c'])
+    highway_vals_df = pd.get_dummies(edges["highway_c"])
 
-    edges = edges.join(highway_vals_df)
+    edges = pd.concat([edges, highway_vals_df], axis=1)
+
     print(edges.columns)
+    print(edges.head())
 
     # edges.drop(columns=['osmid', 'highway', 'maxspeed', 'name', 'reversed', 'ref', 'access', 'width', 'bridge', 'lanes'], inplace=True)
-    
+
     # print(edges.columns)
 
     """
@@ -62,25 +96,25 @@ def infer_metadata(min_lon, min_lat, max_lon, max_lat):
     print("Data loaded successfully!")
     """
 
-    print('Extracting Features')
+    print("Extracting Features")
     X, y = extract_features_from_edges(edges, G_undirected)
+    print(edges.head())
 
     model = CityLearningModel()
 
-    model.load_model('./models/city_learning.pkl')
+    print(os.getcwd())
 
-    osmid_series = X.join(edges['single_osmid'])['single_osmid']
+    model.load_model("modules/city_learning/saved_models/city_learning.pkl")
+
+    osmid_series = X.join(edges["single_osmid"])["single_osmid"]
     y_pred = model.predict(X, osmid_series)
 
     mae, r2, mse, rmse = model.evaluate(y_pred, y)
 
-    print(mae, ', ', r2, ', ', mse, ', ', rmse)
+    print(mae, ", ", r2, ", ", mse, ", ", rmse)
 
-    y_pred.name = 'y_pred'
-    result = edges.merge(y_pred, how='right', left_index=True, right_index=True)
-    return result[['y_pred', 'geometry']].reset_index(drop=True)
+    y_pred.name = "inf_nlanes"
+    result = edges.merge(y_pred, how="right", left_index=True, right_index=True)
+    return result[["inf_nlanes", "geometry"]].reset_index(drop=True)
 
-
-
-# y_pred = infer_metadata(106.8652, -6.2198, 106.8835, -6.2058)
 # %%
