@@ -11,6 +11,6 @@ notebooks
 __pycache__/
 *.pyc
 
-data
+/data
 .vscode
 saved_models
